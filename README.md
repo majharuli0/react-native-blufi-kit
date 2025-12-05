@@ -194,6 +194,35 @@ await BlufiBridge.postCustomData("2:1883");
 await BlufiBridge.postCustomData("8:0");
 ```
 
+### 5. Handling Connection Failures (Wrong Password)
+
+The device reports its connection status via the `BlufiStatus` event. However, the device often **does not send this automatically** after configuration. You must **poll** for the status.
+
+```typescript
+// 1. Listen for status updates
+const statusSub = blufiEmitter?.addListener("BlufiStatus", (event) => {
+  if (event.staConnectionStatus !== undefined) {
+    switch (event.staConnectionStatus) {
+      case 0: console.log("Idle"); break;
+      case 1: console.log("Connecting..."); break;
+      case 2: console.error("❌ Wrong Password"); break;
+      case 3: console.error("❌ SSID Not Found"); break;
+      case 4: console.error("❌ Connection Failed"); break;
+      case 5: console.log("✅ Connected to Wi-Fi"); break;
+    }
+  }
+});
+
+// 2. Poll for status after configuring Wi-Fi
+await BlufiBridge.configureWifi("SSID", "PASSWORD");
+
+// Wait 2-3 seconds for the device to attempt connection, then check status
+setTimeout(async () => {
+    await BlufiBridge.postCustomData("12:"); // Trigger status report (standard Blufi command)
+    await BlufiBridge.requestDeviceStatus(); // Fetch the status
+}, 3000);
+```
+
 ---
 
 ## 🛠 Troubleshooting
