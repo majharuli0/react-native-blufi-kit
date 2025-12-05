@@ -3,7 +3,8 @@ const path = require('path');
 
 const PROJECT_ROOT = process.cwd();
 const IOS_DIR = path.join(PROJECT_ROOT, 'ios');
-const IOS_REFERENCE_DIR = path.join(PROJECT_ROOT, 'ios-reference');
+// Resolve ios-reference relative to this script (e.g., ../ios-reference)
+const IOS_REFERENCE_DIR = path.join(__dirname, '../ios-reference');
 
 function setupIOS() {
     console.log('🍎 Setting up iOS Blufi Module...');
