@@ -34,10 +34,10 @@ If you are trying to implement Espressif Blufi in React Native, you likely faced
 ## 🚀 Installation Guide
 
 ### 1. Copy Files
-Copy the contents of this kit into the **root** of your React Native project.
+Copy the `react-native-blufi-kit` folder into your project (e.g., into a `blufi` folder).
 
 ```bash
-cp -r react-native-blufi-kit/* /path/to/your/project/
+cp -r react-native-blufi-kit /path/to/your/project/blufi
 ```
 
 ### 2. Install Dependencies
@@ -48,12 +48,12 @@ npm install react-native-permissions
 ```
 
 ### 3. Configure `package.json`
-Add the setup scripts to your `package.json` under the `"scripts"` section:
+Add the setup scripts to your `package.json`. Adjust the path to where you copied the scripts.
 
 ```json
 "scripts": {
-  "setup:ios": "node scripts/setup-ios.js",
-  "setup:android": "node scripts/setup-android.js"
+  "setup:ios": "node blufi/scripts/setup-ios.js",
+  "setup:android": "node blufi/scripts/setup-android.js"
 }
 ```
 
@@ -89,44 +89,54 @@ Add the setup scripts to your `package.json` under the `"scripts"` section:
 
 ## 💻 Usage
 
-Import `BlufiClient` in your code and use it to connect and provision devices.
+Import `BlufiClient` in your code.
 
 ```typescript
-import { BlufiClient } from './BlufiClient';
+import { BlufiClient } from './blufi/BlufiClient'; // Adjust path as needed
 
 // 1. Initialize
 const blufi = BlufiClient.getInstance();
 
-// 2. Request Permissions (Android 12+)
-const hasPerms = await blufi.requestPermissions();
-if (!hasPerms) {
-  console.log("Permissions denied");
-  return;
-}
-
-// 3. Scan for Devices
-blufi.startScan((device) => {
-  console.log('Found Device:', device.name, device.mac);
-  
-  // Stop scanning when found
-  blufi.stopScan();
-  connectToDevice(device.mac);
+// 2. Setup Listeners (Important!)
+blufi.onStatusChange((res) => {
+  console.log("Connection Status:", res.msg);
+  if (res.connected) {
+    console.log("✅ Device Connected!");
+  }
 });
+
+blufi.onLog((log) => console.log("Blufi Log:", log));
+
+// 3. Request Permissions & Scan
+async function start() {
+  const hasPerms = await blufi.requestPermissions();
+  if (!hasPerms) return;
+
+  blufi.startScan((device) => {
+    console.log('Found:', device.name, device.mac);
+    
+    // Stop scanning and connect
+    blufi.stopScan();
+    connectToDevice(device.mac);
+  });
+}
 
 // 4. Connect & Provision
 async function connectToDevice(mac: string) {
   try {
+    // Initiate connection (Wait for onStatusChange for actual connection)
     await blufi.connect(mac);
-    console.log("Connected!");
-
-    await blufi.negotiateSecurity();
-    console.log("Security Negotiated");
-
-    await blufi.configureWifi('MyWifiSSID', 'MyWifiPassword');
-    console.log("Wi-Fi Configured!");
+    
+    // Note: You should wait for "Connected" status before negotiating security
+    // For simplicity, we show the flow here, but in a real app, trigger these after the status change.
+    
+    setTimeout(async () => {
+        await blufi.negotiateSecurity();
+        await blufi.configureWifi('MyWifiSSID', 'MyWifiPassword');
+    }, 2000); // Small delay to ensure connection is stable
     
   } catch (error) {
-    console.error("Provisioning failed:", error);
+    console.error("Error:", error);
   }
 }
 ```
