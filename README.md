@@ -27,7 +27,6 @@ If you are trying to implement Espressif Blufi in React Native, you likely faced
 
 *   `ios-reference/`: Native iOS source files (Swift/Obj-C) and Podspec.
 *   `scripts/`: Automation scripts (`setup-ios.js`, `setup-android.js`).
-*   `BlufiClient.ts`: TypeScript wrapper for the native modules.
 
 ---
 
@@ -85,60 +84,114 @@ Add the setup scripts to your `package.json`. Adjust the path to where you copie
     ```
     *This generates the Java modules, patches `build.gradle`, and injects required permissions into `AndroidManifest.xml`.*
 
+### 5. Rebuild App (Crucial!)
+Since this kit adds native code (Swift/Java), you **must rebuild** your app. Hot reload will not work for the initial setup.
+
+```bash
+# iOS
+npx expo run:ios
+
+# Android
+npx expo run:android
+```
+
 ---
 
 ## 💻 Usage
 
-Import `BlufiClient` in your code.
+Since this kit provides direct access to the native modules, you can use them directly in your React Native code.
+
+### 1. Import Native Modules
 
 ```typescript
-import { BlufiClient } from './blufi/BlufiClient'; // Adjust path as needed
+import { NativeModules, NativeEventEmitter, Platform, PermissionsAndroid } from 'react-native';
 
-// 1. Initialize
-const blufi = BlufiClient.getInstance();
+const { BlufiBridge, BluetoothScannerModule } = NativeModules;
 
-// 2. Setup Listeners (Important!)
-blufi.onStatusChange((res) => {
-  console.log("Connection Status:", res.msg);
-  if (res.connected) {
-    console.log("✅ Device Connected!");
-  }
-});
+// Create Emitters
+const blufiEmitter = BlufiBridge ? new NativeEventEmitter(BlufiBridge) : null;
+const scannerEmitter = BluetoothScannerModule ? new NativeEventEmitter(BluetoothScannerModule) : null;
+```
 
-blufi.onLog((log) => console.log("Blufi Log:", log));
+### 2. Setup Listeners (useEffect)
 
-// 3. Request Permissions & Scan
-async function start() {
-  const hasPerms = await blufi.requestPermissions();
-  if (!hasPerms) return;
+It is **critical** to set up listeners to receive status updates, logs, and scan results.
 
-  blufi.startScan((device) => {
-    console.log('Found:', device.name, device.mac);
-    
-    // Stop scanning and connect
-    blufi.stopScan();
-    connectToDevice(device.mac);
+```typescript
+useEffect(() => {
+  // --- Blufi Listeners ---
+  const statusSub = blufiEmitter?.addListener("BlufiStatus", (event) => {
+    console.log("Status:", event.status); // "Connected", "Disconnected", or "Security Result: 0"
+    if (event.status === "Connected" || event.state === 2) {
+      console.log("✅ Device Connected");
+    }
   });
+
+  const logSub = blufiEmitter?.addListener("BlufiLog", (event) => {
+    console.log("Blufi Log:", event.log);
+  });
+
+  const dataSub = blufiEmitter?.addListener("BlufiData", (event) => {
+    console.log("Received Data:", event.data);
+  });
+
+  // --- Scanner Listeners ---
+  const scanSub = scannerEmitter?.addListener("DeviceFound", (device) => {
+    console.log("Found Device:", device.name, device.mac, device.rssi);
+  });
+
+  const scanErrorSub = scannerEmitter?.addListener("ScanError", (event) => {
+    console.error("Scan Error:", event.error);
+  });
+
+  return () => {
+    statusSub?.remove();
+    logSub?.remove();
+    dataSub?.remove();
+    scanSub?.remove();
+    scanErrorSub?.remove();
+  };
+}, []);
+```
+
+### 3. Scanning & Connecting
+
+```typescript
+// Start Scan
+if (BluetoothScannerModule) {
+  BluetoothScannerModule.startScan();
 }
 
-// 4. Connect & Provision
-async function connectToDevice(mac: string) {
+// Stop Scan & Connect
+async function connect(macAddress: string) {
+  BluetoothScannerModule.stopScan();
   try {
-    // Initiate connection (Wait for onStatusChange for actual connection)
-    await blufi.connect(mac);
-    
-    // Note: You should wait for "Connected" status before negotiating security
-    // For simplicity, we show the flow here, but in a real app, trigger these after the status change.
-    
-    setTimeout(async () => {
-        await blufi.negotiateSecurity();
-        await blufi.configureWifi('MyWifiSSID', 'MyWifiPassword');
-    }, 2000); // Small delay to ensure connection is stable
-    
+    await BlufiBridge.connect(macAddress);
+    // Wait for "BlufiStatus" event to confirm connection
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Connection failed", error);
   }
 }
+```
+
+### 4. Provisioning (After Connection)
+
+Once you receive the `Connected` status event:
+
+```typescript
+// 1. Negotiate Security
+await BlufiBridge.negotiateSecurity();
+
+// 2. Configure Wi-Fi
+await BlufiBridge.configureWifi("SSID", "PASSWORD");
+
+// 3. Configure MQTT (Custom Data)
+// Send IP
+await BlufiBridge.postCustomData("1:192.168.1.50");
+// Send Port
+await BlufiBridge.postCustomData("2:1883");
+// Finalize
+await BlufiBridge.postCustomData("8:0");
 ```
 
 ---
