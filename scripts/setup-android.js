@@ -552,6 +552,70 @@ function installAndroid() {
             console.log('✅ AndroidManifest.xml already patched');
         }
     }
+
+    // Patch MainApplication.kt or MainApplication.java
+    const packageNamePath = packageName.replace(/\./g, '/');
+    const mainAppKt = path.join(PROJECT_ROOT, 'android/app/src/main/java', packageNamePath, 'MainApplication.kt');
+    const mainAppJava = path.join(PROJECT_ROOT, 'android/app/src/main/java', packageNamePath, 'MainApplication.java');
+
+    let mainAppPath = null;
+    if (fs.existsSync(mainAppKt)) mainAppPath = mainAppKt;
+    else if (fs.existsSync(mainAppJava)) mainAppPath = mainAppJava;
+
+    if (mainAppPath) {
+        let content = fs.readFileSync(mainAppPath, 'utf8');
+        const isKotlin = mainAppPath.endsWith('.kt');
+
+        if (!content.includes('BlufiPackage')) {
+            console.log(`🔧 Patching ${path.basename(mainAppPath)}...`);
+
+            if (isKotlin) {
+                // Kotlin Patching
+                // 1. Add Import (if PackageList exists)
+                if (content.includes('import com.facebook.react.PackageList')) {
+                    content = content.replace(
+                        'import com.facebook.react.PackageList',
+                        `import com.facebook.react.PackageList\nimport ${packageName}.BlufiPackage`
+                    );
+                }
+
+                // 2. Add Package to getPackages()
+                // Look for "packages.apply {" or similar
+                if (content.includes('packages.apply {')) {
+                    content = content.replace(
+                        'packages.apply {',
+                        `packages.apply {\n              add(BlufiPackage())`
+                    );
+                    fs.writeFileSync(mainAppPath, content);
+                    console.log(`✅ Registered BlufiPackage in ${path.basename(mainAppPath)}`);
+                } else {
+                    console.warn(`⚠️ Could not find place to add BlufiPackage in ${path.basename(mainAppPath)}`);
+                }
+            } else {
+                // Java Patching
+                // 1. Add Import
+                if (content.includes('import com.facebook.react.PackageList;')) {
+                    content = content.replace(
+                        'import com.facebook.react.PackageList;',
+                        `import com.facebook.react.PackageList;\nimport ${packageName}.BlufiPackage;`
+                    );
+                }
+
+                // 2. Add Package
+                if (content.includes('new PackageList(this).getPackages();')) {
+                    // This is trickier in Java standard templates, but often it's:
+                    // return new PackageList(this).getPackages();
+                    // We need to verify standard RN Java template if we want to robustly support Java.
+                    // For now, focusing on the Kotlin template which is standard for modern Expo/RN.
+                    console.warn('⚠️ Java MainApplication patching is manual for now. Please add "packages.add(new BlufiPackage());" manually.');
+                }
+            }
+        } else {
+            console.log(`✅ ${path.basename(mainAppPath)} already registered BlufiPackage`);
+        }
+    } else {
+        console.error('❌ Could not find MainApplication.kt or MainApplication.java');
+    }
 }
 
 function main() {
