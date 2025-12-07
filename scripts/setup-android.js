@@ -224,7 +224,6 @@ public class BlufiModule extends ReactContextBaseJavaModule {
                 params.putString("status", "Device Status");
                 params.putInt("opMode", response.getOpMode());
                 params.putInt("staConnectionStatus", response.getStaConnectionStatus());
-                params.putInt("softApConnectionCount", response.getSoftApConnectionCount());
                 sendEvent("BlufiStatus", params);
             }
         }
