@@ -1,4 +1,4 @@
-import { NativeModules, NativeEventEmitter, Platform, PermissionsAndroid } from 'react-native';
+import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
 const { BlufiBridge, BluetoothScannerModule } = NativeModules;
 const blufiEmitter = BlufiBridge ? new NativeEventEmitter(BlufiBridge) : null;
