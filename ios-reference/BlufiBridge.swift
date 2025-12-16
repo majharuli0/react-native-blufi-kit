@@ -15,11 +15,15 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     }
     
     @objc func connect(_ deviceId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        // deviceId on iOS is the UUID string
-        // In a real scenario, you need to pass the CBPeripheral object to the client.
-        // The current BlufiClient.h has - (void)connect:(NSString *)identifier; which takes a string identifier.
-        // Assuming the ObjC library handles retrieval or we need to adapt.
+        // Re-init client to ensure fresh state (Fixes crash on re-connection)
+        if (blufiClient != nil) {
+            blufiClient.close()
+            blufiClient.blufiDelegate = nil
+        }
+        blufiClient = BlufiClient()
+        blufiClient.blufiDelegate = self
         
+        // deviceId on iOS is the UUID string
         blufiClient.connect(deviceId)
         resolve(true)
     }
@@ -53,11 +57,32 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
         }
     }
     
-    // MARK: - BlufiDelegate
+    @objc func requestDeviceWifiScan(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        blufiClient.requestDeviceScan()
+        resolve(true)
+    }
     
-    // Note: There isn't a generic "didUpdate state" delegate method in the header.
-    // We can infer connection state from gattPrepared or other callbacks, or we might need to listen to central manager events if exposed.
-    // For now, we'll use gattPrepared as a proxy for "Connected/Ready".
+    @objc func setOpMode(_ opMode: Int, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let params = BlufiConfigureParams()
+        // Determine OpMode from integer (1 = STA, 2 = SoftAP, 3 = SoftAP+STA)
+        if (opMode == 1) { params.opMode = OpModeSta }
+        else if (opMode == 2) { params.opMode = OpModeSoftAP }
+        else if (opMode == 3) { params.opMode = OpModeStaSoftAP }
+        else { params.opMode = OpModeSta } // Default
+        
+        blufiClient.configure(params)
+        resolve(true)
+    }
+    
+    @objc func requestDeviceVersion() {
+        blufiClient.requestDeviceVersion()
+    }
+    
+    @objc func requestDeviceStatus() {
+        blufiClient.requestDeviceStatus()
+    }
+    
+    // MARK: - BlufiDelegate
     
     public func blufi(_ client: BlufiClient, gattPrepared status: BlufiStatusCode, service: CBService?, writeChar: CBCharacteristic?, notifyChar: CBCharacteristic?) {
         if status == StatusSuccess {
@@ -81,10 +106,43 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
         }
     }
     
+    public func blufi(_ client: BlufiClient, didReceiveDeviceScanResponse scanResults: [BlufiScanResponse]?, status: BlufiStatusCode) {
+        DispatchQueue.main.async {
+            var data: [[String: Any]] = []
+            if let results = scanResults {
+                for result in results {
+                    data.append(["ssid": result.ssid, "rssi": result.rssi])
+                }
+            }
+            
+            // Emit standard event matching Android payload
+            self.sendEvent(withName: "BlufiDeviceScanResult", body: ["data": data])
+            
+            // Also emit status for logging
+            self.sendEvent(withName: "BlufiStatus", body: ["status": "Device Scan Result: \(status.rawValue)"])
+        }
+    }
+    
+    public func blufi(_ client: BlufiClient, didReceiveDeviceVersionResponse response: BlufiVersionResponse?, status: BlufiStatusCode) {
+        if let resp = response {
+             // sendEvent(withName: "BlufiStatus", body: ["status": "Device Version: \(resp.versionString ?? "Unknown")"]) 
+        }
+    }
+    
+    public func blufi(_ client: BlufiClient, didReceiveDeviceStatusResponse response: BlufiStatusResponse?, status: BlufiStatusCode) {
+        if let resp = response {
+             sendEvent(withName: "BlufiStatus", body: ["status": "Device Status: OpMode \(resp.opMode)"])
+        }
+    }
+    
+    public func blufi(_ client: BlufiClient, didReceiveError errCode: Int) {
+        sendEvent(withName: "BlufiStatus", body: ["status": "Error: \(errCode)"])
+    }
+    
     // MARK: - RCTEventEmitter
     
     public override func supportedEvents() -> [String]! {
-        return ["BlufiStatus", "BlufiLog", "BlufiData"]
+        return ["BlufiStatus", "BlufiLog", "BlufiData", "BlufiDeviceScanResult"]
     }
     
     public override static func requiresMainQueueSetup() -> Bool {

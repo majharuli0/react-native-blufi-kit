@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.platform     = :ios, "13.0"
   s.source       = { :git => "https://github.com/example/sensor-connection-tester.git", :tag => "#{s.version}" }
 
-  s.source_files = "BlufiBridge.{h,m,swift}", "BluetoothScannerModule.{h,m,swift}", "BlufiLibrary/**/*.{h,m}"
+  s.source_files = ["*.{h,m,swift}", "BlufiLibrary/**/*.{h,m,c,swift}"]
   s.requires_arc = true
 
   s.dependency "React-Core"
