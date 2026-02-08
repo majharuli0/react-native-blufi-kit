@@ -12,6 +12,15 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
         super.init()
         blufiClient = BlufiClient()
         blufiClient.blufiDelegate = self
+        blufiClient.centralManagerDelete = self
+    }
+    
+    private func sendLog(_ message: String) {
+        sendEvent(withName: "BlufiLog", body: ["log": message])
+    }
+
+    private func sendStatus(_ status: String) {
+        sendEvent(withName: "BlufiStatus", body: ["status": status])
     }
     
     @objc func connect(_ deviceId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
@@ -22,15 +31,18 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
         }
         blufiClient = BlufiClient()
         blufiClient.blufiDelegate = self
+        blufiClient.centralManagerDelete = self
         
+        sendLog("Connecting to device: \(deviceId)")
         // deviceId on iOS is the UUID string
         blufiClient.connect(deviceId)
         resolve(true)
     }
     
     @objc func disconnect() {
+        sendLog("Manual disconnect requested")
         blufiClient.close()
-        sendEvent(withName: "BlufiStatus", body: ["status": "Disconnected", "state": 0])
+        sendStatus("Disconnected")
     }
     
     @objc func negotiateSecurity(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
@@ -44,11 +56,13 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
         params.staSsid = ssid
         params.staPassword = password
         
+        sendLog("Configuring WiFi: SSID=\(ssid)")
         blufiClient.configure(params)
         resolve(true)
     }
     
     @objc func postCustomData(_ data: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        sendLog("Posting Custom Data: \(data)")
         if let dataBytes = data.data(using: .utf8) {
             blufiClient.postCustomData(dataBytes)
             resolve(true)
@@ -85,6 +99,7 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     // MARK: - BlufiDelegate
     
     public func blufi(_ client: BlufiClient, gattPrepared status: BlufiStatusCode, service: CBService?, writeChar: CBCharacteristic?, notifyChar: CBCharacteristic?) {
+        sendLog("GATT Prepared status: \(status.rawValue)")
         if status == StatusSuccess {
             sendEvent(withName: "BlufiStatus", body: ["status": "Connected", "state": 2])
         } else {
@@ -93,15 +108,18 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     }
     
     public func blufi(_ client: BlufiClient, didNegotiateSecurity status: BlufiStatusCode) {
+        sendLog("Security negotiation status: \(status.rawValue)")
         sendEvent(withName: "BlufiStatus", body: ["status": "Security Result: \(status.rawValue)"])
     }
     
     public func blufi(_ client: BlufiClient, didPostConfigureParams status: BlufiStatusCode) {
+        sendLog("Post configure params status: \(status.rawValue)")
         sendEvent(withName: "BlufiStatus", body: ["status": "Configure Params: \(status.rawValue)"])
     }
     
     public func blufi(_ client: BlufiClient, didReceiveCustomData data: Data, status: BlufiStatusCode) {
         if let dataStr = String(data: data, encoding: .utf8) {
+            sendLog("Received Custom Data: \(dataStr)")
             sendEvent(withName: "BlufiData", body: ["data": dataStr])
         }
     }
@@ -131,11 +149,19 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     
     public func blufi(_ client: BlufiClient, didReceiveDeviceStatusResponse response: BlufiStatusResponse?, status: BlufiStatusCode) {
         if let resp = response {
+             sendLog("Device Status Response: \(status.rawValue), OpMode: \(resp.opMode)")
              sendEvent(withName: "BlufiStatus", body: ["status": "Device Status: OpMode \(resp.opMode)"])
         }
     }
     
+    public func blufi(_ client: BlufiClient, didPostCustomData data: Data, status: BlufiStatusCode) {
+        if let dataStr = String(data: data, encoding: .utf8) {
+            sendLog("Post Custom Data (\(dataStr)) status: \(status.rawValue)")
+        }
+    }
+    
     public func blufi(_ client: BlufiClient, didReceiveError errCode: Int) {
+        sendLog("Blufi Error: \(errCode)")
         sendEvent(withName: "BlufiStatus", body: ["status": "Error: \(errCode)"])
     }
     
@@ -147,5 +173,16 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     
     public override static func requiresMainQueueSetup() -> Bool {
         return true
+    }
+}
+
+extension BlufiBridge: CBCentralManagerDelegate {
+    public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        sendLog("Central Manager State: \(central.state.rawValue)")
+    }
+    
+    public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        sendLog("Peripheral Disconnected: \(peripheral.identifier.uuidString)")
+        sendStatus("Disconnected")
     }
 }

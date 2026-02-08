@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 // --- EMBEDDED SOURCE CODE TEMPLATES ---
 // Note: We use placeholders like {{PACKAGE_NAME}} to be replaced dynamically.
@@ -582,81 +582,102 @@ public class BlufiPackage implements ReactPackage {
 // --- INSTALLATION LOGIC ---
 
 const PROJECT_ROOT = process.cwd();
-const ANDROID_MANIFEST_PATH = path.join(PROJECT_ROOT, 'android/app/src/main/AndroidManifest.xml');
-const BUILD_GRADLE = path.join(PROJECT_ROOT, 'android/app/build.gradle');
+const ANDROID_MANIFEST_PATH = path.join(
+  PROJECT_ROOT,
+  "android/app/src/main/AndroidManifest.xml",
+);
+const BUILD_GRADLE = path.join(PROJECT_ROOT, "android/app/build.gradle");
 
 function getAndroidPackageName() {
-    // 1. Try AndroidManifest.xml
-    if (fs.existsSync(ANDROID_MANIFEST_PATH)) {
-        const content = fs.readFileSync(ANDROID_MANIFEST_PATH, 'utf8');
-        const match = content.match(/package="([^"]+)"/);
-        if (match && match[1]) {
-            return match[1];
-        }
+  // 1. Try AndroidManifest.xml
+  if (fs.existsSync(ANDROID_MANIFEST_PATH)) {
+    const content = fs.readFileSync(ANDROID_MANIFEST_PATH, "utf8");
+    const match = content.match(/package="([^"]+)"/);
+    if (match && match[1]) {
+      return match[1];
     }
+  }
 
-    // 2. Try build.gradle (namespace)
-    if (fs.existsSync(BUILD_GRADLE)) {
-        const content = fs.readFileSync(BUILD_GRADLE, 'utf8');
-        const match = content.match(/namespace\s+['"]([^'"]+)['"]/);
-        if (match && match[1]) {
-            return match[1];
-        }
+  // 2. Try build.gradle (namespace)
+  if (fs.existsSync(BUILD_GRADLE)) {
+    const content = fs.readFileSync(BUILD_GRADLE, "utf8");
+    const match = content.match(/namespace\s+['"]([^'"]+)['"]/);
+    if (match && match[1]) {
+      return match[1];
     }
+  }
 
-    console.error('❌ Could not parse package name from AndroidManifest.xml or build.gradle');
-    return null;
+  console.error(
+    "❌ Could not parse package name from AndroidManifest.xml or build.gradle",
+  );
+  return null;
 }
 
 function writeFile(dest, content) {
-    const dir = path.dirname(dest);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(dest, content);
-    console.log(`✅ Created ${path.basename(dest)}`);
+  const dir = path.dirname(dest);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(dest, content);
+  console.log(`✅ Created ${path.basename(dest)}`);
 }
 
 function installAndroid() {
-    console.log('\n--- Installing Android Native Modules ---');
-    const packageName = getAndroidPackageName();
-    if (!packageName) return;
+  console.log("\n--- Installing Android Native Modules ---");
+  const packageName = getAndroidPackageName();
+  if (!packageName) return;
 
-    console.log(`ℹ️  Detected Android Package: ${packageName}`);
+  console.log(`ℹ️  Detected Android Package: ${packageName}`);
 
-    // Convert package (com.example.app) to path (com/example/app)
-    const packagePath = packageName.replace(/\./g, '/');
-    const targetDir = path.join(PROJECT_ROOT, 'android/app/src/main/java', packagePath);
+  // Convert package (com.example.app) to path (com/example/app)
+  const packagePath = packageName.replace(/\./g, "/");
+  const targetDir = path.join(
+    PROJECT_ROOT,
+    "android/app/src/main/java",
+    packagePath,
+  );
 
-    // Replace placeholder in templates
-    const blufiModule = BLUFI_MODULE_JAVA.replace('{{PACKAGE_NAME}}', packageName);
-    const scannerModule = BLUETOOTH_SCANNER_MODULE_JAVA.replace('{{PACKAGE_NAME}}', packageName);
-    const blufiPackage = BLUFI_PACKAGE_JAVA.replace('{{PACKAGE_NAME}}', packageName);
+  // Replace placeholder in templates
+  const blufiModule = BLUFI_MODULE_JAVA.replace(
+    "{{PACKAGE_NAME}}",
+    packageName,
+  );
+  const scannerModule = BLUETOOTH_SCANNER_MODULE_JAVA.replace(
+    "{{PACKAGE_NAME}}",
+    packageName,
+  );
+  const blufiPackage = BLUFI_PACKAGE_JAVA.replace(
+    "{{PACKAGE_NAME}}",
+    packageName,
+  );
 
-    writeFile(path.join(targetDir, 'BlufiModule.java'), blufiModule);
-    writeFile(path.join(targetDir, 'BluetoothScannerModule.java'), scannerModule);
-    writeFile(path.join(targetDir, 'BlufiPackage.java'), blufiPackage);
+  writeFile(path.join(targetDir, "BlufiModule.java"), blufiModule);
+  writeFile(path.join(targetDir, "BluetoothScannerModule.java"), scannerModule);
+  writeFile(path.join(targetDir, "BlufiPackage.java"), blufiPackage);
 
-    // Patch build.gradle
-    if (fs.existsSync(BUILD_GRADLE)) {
-        let content = fs.readFileSync(BUILD_GRADLE, 'utf8');
-        if (!content.includes('lib-blufi-android')) {
-            console.log('🔧 Patching build.gradle...');
-            const dependency = `    implementation 'com.github.EspressifApp:lib-blufi-android:2.4.1'`;
-            content = content.replace('dependencies {', `dependencies {\n${dependency}`);
-            fs.writeFileSync(BUILD_GRADLE, content);
-            console.log('✅ Added Blufi dependency to build.gradle');
-        } else {
-            console.log('✅ build.gradle already patched');
-        }
+  // Patch build.gradle
+  if (fs.existsSync(BUILD_GRADLE)) {
+    let content = fs.readFileSync(BUILD_GRADLE, "utf8");
+    if (!content.includes("lib-blufi-android")) {
+      console.log("🔧 Patching build.gradle...");
+      const dependency = `    implementation 'com.github.EspressifApp:lib-blufi-android:2.4.1'`;
+      content = content.replace(
+        "dependencies {",
+        `dependencies {\n${dependency}`,
+      );
+      fs.writeFileSync(BUILD_GRADLE, content);
+      console.log("✅ Added Blufi dependency to build.gradle");
+    } else {
+      console.log("✅ build.gradle already patched");
     }
+  }
 
-    // Patch AndroidManifest.xml
-    if (fs.existsSync(ANDROID_MANIFEST_PATH)) {
-        let manifestContent = fs.readFileSync(ANDROID_MANIFEST_PATH, 'utf8');
-        if (!manifestContent.includes('android.permission.BLUETOOTH_SCAN')) {
-            console.log('🔧 Patching AndroidManifest.xml...');
-            const permissions = `
+  // Patch AndroidManifest.xml
+  if (fs.existsSync(ANDROID_MANIFEST_PATH)) {
+    let manifestContent = fs.readFileSync(ANDROID_MANIFEST_PATH, "utf8");
+    if (!manifestContent.includes("android.permission.BLUETOOTH_SCAN")) {
+      console.log("🔧 Patching AndroidManifest.xml...");
+      const permissions = `
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -666,87 +687,153 @@ function installAndroid() {
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />`;
 
-            if (manifestContent.includes('<application')) {
-                manifestContent = manifestContent.replace('<application', `${permissions}\n    <application`);
-                fs.writeFileSync(ANDROID_MANIFEST_PATH, manifestContent);
-                console.log('✅ Added Bluetooth permissions to AndroidManifest.xml');
-            } else {
-                console.warn('⚠️ Could not find <application> tag in AndroidManifest.xml');
-            }
-        } else {
-            console.log('✅ AndroidManifest.xml already patched');
-        }
-    }
-
-    // Patch MainApplication.kt or MainApplication.java
-    const packageNamePath = packageName.replace(/\./g, '/');
-    const mainAppKt = path.join(PROJECT_ROOT, 'android/app/src/main/java', packageNamePath, 'MainApplication.kt');
-    const mainAppJava = path.join(PROJECT_ROOT, 'android/app/src/main/java', packageNamePath, 'MainApplication.java');
-
-    let mainAppPath = null;
-    if (fs.existsSync(mainAppKt)) mainAppPath = mainAppKt;
-    else if (fs.existsSync(mainAppJava)) mainAppPath = mainAppJava;
-
-    if (mainAppPath) {
-        let content = fs.readFileSync(mainAppPath, 'utf8');
-        const isKotlin = mainAppPath.endsWith('.kt');
-
-        if (!content.includes('BlufiPackage')) {
-            console.log(`🔧 Patching ${path.basename(mainAppPath)}...`);
-
-            if (isKotlin) {
-                // Kotlin Patching
-                // 1. Add Import (if PackageList exists)
-                if (content.includes('import com.facebook.react.PackageList')) {
-                    content = content.replace(
-                        'import com.facebook.react.PackageList',
-                        `import com.facebook.react.PackageList\nimport ${packageName}.BlufiPackage`
-                    );
-                }
-
-                // 2. Add Package to getPackages()
-                // Look for "packages.apply {" or similar
-                if (content.includes('packages.apply {')) {
-                    content = content.replace(
-                        'packages.apply {',
-                        `packages.apply {\n              add(BlufiPackage())`
-                    );
-                    fs.writeFileSync(mainAppPath, content);
-                    console.log(`✅ Registered BlufiPackage in ${path.basename(mainAppPath)}`);
-                } else {
-                    console.warn(`⚠️ Could not find place to add BlufiPackage in ${path.basename(mainAppPath)}`);
-                }
-            } else {
-                // Java Patching
-                // 1. Add Import
-                if (content.includes('import com.facebook.react.PackageList;')) {
-                    content = content.replace(
-                        'import com.facebook.react.PackageList;',
-                        `import com.facebook.react.PackageList;\nimport ${packageName}.BlufiPackage;`
-                    );
-                }
-
-                // 2. Add Package
-                if (content.includes('new PackageList(this).getPackages();')) {
-                    // This is trickier in Java standard templates, but often it's:
-                    // return new PackageList(this).getPackages();
-                    // We need to verify standard RN Java template if we want to robustly support Java.
-                    // For now, focusing on the Kotlin template which is standard for modern Expo/RN.
-                    console.warn('⚠️ Java MainApplication patching is manual for now. Please add "packages.add(new BlufiPackage());" manually.');
-                }
-            }
-        } else {
-            console.log(`✅ ${path.basename(mainAppPath)} already registered BlufiPackage`);
-        }
+      if (manifestContent.includes("<application")) {
+        manifestContent = manifestContent.replace(
+          "<application",
+          `${permissions}\n    <application`,
+        );
+        fs.writeFileSync(ANDROID_MANIFEST_PATH, manifestContent);
+        console.log("✅ Added Bluetooth permissions to AndroidManifest.xml");
+      } else {
+        console.warn(
+          "⚠️ Could not find <application> tag in AndroidManifest.xml",
+        );
+      }
     } else {
-        console.error('❌ Could not find MainApplication.kt or MainApplication.java');
+      console.log("✅ AndroidManifest.xml already patched");
     }
+  }
+
+  // Patch MainApplication.kt or MainApplication.java
+  const packageNamePath = packageName.replace(/\./g, "/");
+  const mainAppKt = path.join(
+    PROJECT_ROOT,
+    "android/app/src/main/java",
+    packageNamePath,
+    "MainApplication.kt",
+  );
+  const mainAppJava = path.join(
+    PROJECT_ROOT,
+    "android/app/src/main/java",
+    packageNamePath,
+    "MainApplication.java",
+  );
+
+  let mainAppPath = null;
+  if (fs.existsSync(mainAppKt)) mainAppPath = mainAppKt;
+  else if (fs.existsSync(mainAppJava)) mainAppPath = mainAppJava;
+
+  if (mainAppPath) {
+    let content = fs.readFileSync(mainAppPath, "utf8");
+    const isKotlin = mainAppPath.endsWith(".kt");
+
+    if (!content.includes("BlufiPackage")) {
+      console.log(`🔧 Patching ${path.basename(mainAppPath)}...`);
+
+      if (isKotlin) {
+        // Kotlin Patching
+        // 1. Add Import (if PackageList exists)
+        if (content.includes("import com.facebook.react.PackageList")) {
+          content = content.replace(
+            "import com.facebook.react.PackageList",
+            `import com.facebook.react.PackageList\nimport ${packageName}.BlufiPackage`,
+          );
+        }
+
+        // 2. Add Package to getPackages()
+        // Look for "packages.apply {" or similar
+        if (content.includes("packages.apply {")) {
+          content = content.replace(
+            "packages.apply {",
+            `packages.apply {\n              add(BlufiPackage())`,
+          );
+          fs.writeFileSync(mainAppPath, content);
+          console.log(
+            `✅ Registered BlufiPackage in ${path.basename(mainAppPath)}`,
+          );
+        } else {
+          console.warn(
+            `⚠️ Could not find place to add BlufiPackage in ${path.basename(mainAppPath)}`,
+          );
+        }
+      } else {
+        // Java Patching
+        // 1. Add Import
+        if (content.includes("import com.facebook.react.PackageList;")) {
+          content = content.replace(
+            "import com.facebook.react.PackageList;",
+            `import com.facebook.react.PackageList;\nimport ${packageName}.BlufiPackage;`,
+          );
+        }
+
+        // 2. Add Package
+        if (content.includes("new PackageList(this).getPackages();")) {
+          // This is trickier in Java standard templates, but often it's:
+          // return new PackageList(this).getPackages();
+          // We need to verify standard RN Java template if we want to robustly support Java.
+          // For now, focusing on the Kotlin template which is standard for modern Expo/RN.
+          console.warn(
+            '⚠️ Java MainApplication patching is manual for now. Please add "packages.add(new BlufiPackage());" manually.',
+          );
+        }
+      }
+    } else {
+      console.log(
+        `✅ ${path.basename(mainAppPath)} already registered BlufiPackage`,
+      );
+    }
+  } else {
+    console.error(
+      "❌ Could not find MainApplication.kt or MainApplication.java",
+    );
+  }
+
+  // Patch settings.gradle (Fix for Node Path)
+  const SETTINGS_GRADLE = path.join(PROJECT_ROOT, "android/settings.gradle");
+  if (fs.existsSync(SETTINGS_GRADLE)) {
+    let content = fs.readFileSync(SETTINGS_GRADLE, "utf8");
+    if (content.includes('commandLine("node"')) {
+      console.log("🔧 Patching settings.gradle for absolute Node path...");
+      // Replace "node" with process.execPath (absolute path to current node executable)
+      const nodePath = process.execPath;
+      content = content.replace(
+        /commandLine\("node"/g,
+        `commandLine("${nodePath}"`,
+      );
+      fs.writeFileSync(SETTINGS_GRADLE, content);
+      console.log(`✅ Updated settings.gradle to use Node at: ${nodePath}`);
+    } else {
+      console.log("✅ settings.gradle already using absolute path or patched");
+    }
+  }
+
+  // Patch gradlew (Fix for PATH)
+  const GRADLEW = path.join(PROJECT_ROOT, "android/gradlew");
+  if (fs.existsSync(GRADLEW)) {
+    let content = fs.readFileSync(GRADLEW, "utf8");
+    if (!content.includes('export PATH="/opt/homebrew/bin:$PATH"')) {
+      console.log("🔧 Patching gradlew for Homebrew PATH...");
+      const shebang = "#!/bin/sh";
+      if (content.startsWith(shebang)) {
+        content = content.replace(
+          shebang,
+          `${shebang}\n\nexport PATH="/opt/homebrew/bin:$PATH"`,
+        );
+        fs.writeFileSync(GRADLEW, content);
+        console.log("✅ Added Homebrew PATH to gradlew");
+      }
+    } else {
+      console.log("✅ gradlew already patched with PATH");
+    }
+  }
 }
 
 function main() {
-    console.log('🚀 Starting Blufi Android Installer ...');
-    installAndroid();
-    console.log('\n✅ Android Setup Complete! Rebuild your app with "npx expo run:android".');
+  console.log("🚀 Starting Blufi Android Installer ...");
+  installAndroid();
+  console.log(
+    '\n✅ Android Setup Complete! Rebuild your app with "npx expo run:android".',
+  );
 }
 
 main();
