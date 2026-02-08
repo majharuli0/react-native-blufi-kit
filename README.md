@@ -1,53 +1,20 @@
 # 🚀 react-native-blufi-kit
 
-A **robust, self-contained, and portable** solution for integrating Espressif's Blufi (Wi-Fi Provisioning) into React Native applications. 
-
-Designed to solve the build and runtime issues found in unmaintained libraries like `react-native-blufi` (kefudev) and `orbitsystems`.
-
----
-
-## 🧐 Why this Kit?
-
-If you are trying to implement Espressif Blufi in React Native, you likely faced these issues with existing libraries:
-*   ❌ **Build Failures**: Incompatibility with modern Gradle, Android 12+, or iOS 16+.
-*   ❌ **Missing Permissions**: Crashes on Android 12+ due to missing `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` permissions.
-*   ❌ **Linking Errors**: "Module not found" or null pointer exceptions at runtime.
-*   ❌ **Abandoned**: Most libraries haven't been updated in years.
-
-**This Kit Solves It By:**
-*   ✅ **Providing Raw Source Code**: No compiled binaries or hidden dependencies. You get the actual Swift and Java files.
-*   ✅ **Automated Setup Scripts**: One-command setup for iOS and Android (`npm run setup:ios`, `npm run setup:android`).
-*   ✅ **Modern Android Support**: Automatically handles Android 12+ Bluetooth permissions in `AndroidManifest.xml`.
-*   ✅ **Modern iOS Support**: Written in Swift with proper `Podspec` and `Info.plist` configuration.
-*   ✅ **TypeScript Client**: Includes a ready-to-use `BlufiClient.ts` wrapper.
+A **robust, self-contained, and portable** solution for integrating Espressif's Blufi (Wi-Fi Provisioning) into React Native applications.
 
 ---
 
 ## 📦 Contents
 
-*   `ios-reference/`: Native iOS source files (Swift/Obj-C) and Podspec.
-*   `scripts/`: Automation scripts (`setup-ios.js`, `setup-android.js`).
+- `ios-reference/`: Native iOS source files (Swift/Obj-C) and Podspec.
+- `scripts/`: Automation scripts (`setup-ios.js`, `setup-android.js`).
+- `BlufiClient.ts`: TypeScript wrapper for the Native Module.
 
 ---
 
-## 🚀 Installation Guide
+## 🚀 Installation & Setup
 
-### 1. Copy Files
-Copy the `react-native-blufi-kit` folder into your project (e.g., into a `blufi` folder).
-
-```bash
-cp -r react-native-blufi-kit /path/to/your/project/blufi
-```
-
-### 2. Install Dependencies
-This kit uses `react-native-permissions` for runtime permission checks (optional but recommended).
-
-```bash
-npm install react-native-permissions
-```
-
-### 3. Configure `package.json`
-Add the setup scripts to your `package.json`. Adjust the path to where you copied the scripts.
+### 1. Configure `package.json`
 
 ```json
 "scripts": {
@@ -56,184 +23,93 @@ Add the setup scripts to your `package.json`. Adjust the path to where you copie
 }
 ```
 
-### 4. Run Setup
-
-#### 🍎 iOS Setup
-1.  **Prebuild** (if using Expo):
-    ```bash
-    npx expo prebuild --platform ios
-    ```
-2.  **Run Script**:
-    ```bash
-    npm run setup:ios
-    ```
-    *This copies the Swift/Obj-C files, updates `Podfile`, and adds Bluetooth permissions to `Info.plist`.*
-3.  **Install Pods**:
-    ```bash
-    cd ios && pod install && cd ..
-    ```
-
-#### 🤖 Android Setup
-1.  **Prebuild** (if using Expo):
-    ```bash
-    npx expo prebuild --platform android
-    ```
-2.  **Run Script**:
-    ```bash
-    npm run setup:android
-    ```
-    *This generates the Java modules, patches `build.gradle`, and injects required permissions into `AndroidManifest.xml`.*
-
-### 5. Rebuild App (Crucial!)
-Since this kit adds native code (Swift/Java), you **must rebuild** your app. Hot reload will not work for the initial setup.
+### 2. Run Setup
 
 ```bash
 # iOS
-npx expo run:ios
+npm run setup:ios
+cd ios && pod install
 
 # Android
-npx expo run:android
+npm run setup:android
 ```
 
 ---
 
-## 💻 Usage
+## 💻 API Reference
 
-Since this kit provides direct access to the native modules, you can use them directly in your React Native code.
-
-### 1. Import Native Modules
+### 1. Importing & Initialization
 
 ```typescript
-import { NativeModules, NativeEventEmitter, Platform, PermissionsAndroid } from 'react-native';
+import { NativeModules, NativeEventEmitter } from "react-native";
 
 const { BlufiBridge, BluetoothScannerModule } = NativeModules;
 
-// Create Emitters
+// Emitters for listening to events
 const blufiEmitter = BlufiBridge ? new NativeEventEmitter(BlufiBridge) : null;
-const scannerEmitter = BluetoothScannerModule ? new NativeEventEmitter(BluetoothScannerModule) : null;
+const scannerEmitter = BluetoothScannerModule
+  ? new NativeEventEmitter(BluetoothScannerModule)
+  : null;
 ```
 
-### 2. Setup Listeners (useEffect)
+### 2. `BluetoothScannerModule` Methods
 
-It is **critical** to set up listeners to receive status updates, logs, and scan results.
+Used for finding nearby Blufi-enabled devices.
 
-```typescript
-useEffect(() => {
-  // --- Blufi Listeners ---
-  const statusSub = blufiEmitter?.addListener("BlufiStatus", (event) => {
-    console.log("Status:", event.status); // "Connected", "Disconnected", or "Security Result: 0"
-    if (event.status === "Connected" || event.state === 2) {
-      console.log("✅ Device Connected");
-    }
-  });
+| Method        | Description                      |
+| :------------ | :------------------------------- |
+| `startScan()` | Begins scanning for BLE devices. |
+| `stopScan()`  | Stops the current scan.          |
 
-  const logSub = blufiEmitter?.addListener("BlufiLog", (event) => {
-    console.log("Blufi Log:", event.log);
-  });
+**Events (`scannerEmitter`):**
 
-  const dataSub = blufiEmitter?.addListener("BlufiData", (event) => {
-    console.log("Received Data:", event.data);
-  });
-
-  // --- Scanner Listeners ---
-  const scanSub = scannerEmitter?.addListener("DeviceFound", (device) => {
-    console.log("Found Device:", device.name, device.mac, device.rssi);
-  });
-
-  const scanErrorSub = scannerEmitter?.addListener("ScanError", (event) => {
-    console.error("Scan Error:", event.error);
-  });
-
-  return () => {
-    statusSub?.remove();
-    logSub?.remove();
-    dataSub?.remove();
-    scanSub?.remove();
-    scanErrorSub?.remove();
-  };
-}, []);
-```
-
-### 3. Scanning & Connecting
-
-```typescript
-// Start Scan
-if (BluetoothScannerModule) {
-  BluetoothScannerModule.startScan();
-}
-
-// Stop Scan & Connect
-async function connect(macAddress: string) {
-  BluetoothScannerModule.stopScan();
-  try {
-    await BlufiBridge.connect(macAddress);
-    // Wait for "BlufiStatus" event to confirm connection
-  } catch (error) {
-    console.error("Connection failed", error);
-  }
-}
-```
-
-### 4. Provisioning (After Connection)
-
-Once you receive the `Connected` status event:
-
-```typescript
-// 1. Negotiate Security
-await BlufiBridge.negotiateSecurity();
-
-// 2. Configure Wi-Fi
-await BlufiBridge.configureWifi("SSID", "PASSWORD");
-
-// 3. Configure MQTT (Custom Data)
-// Send IP
-await BlufiBridge.postCustomData("1:192.168.1.50");
-// Send Port
-await BlufiBridge.postCustomData("2:1883");
-// Finalize
-await BlufiBridge.postCustomData("8:0");
-```
-
-### 5. Handling Connection Failures (Wrong Password)
-
-The device reports its connection status via the `BlufiStatus` event. However, the device often **does not send this automatically** after configuration. You must **poll** for the status.
-
-```typescript
-// 1. Listen for status updates
-const statusSub = blufiEmitter?.addListener("BlufiStatus", (event) => {
-  if (event.staConnectionStatus !== undefined) {
-    switch (event.staConnectionStatus) {
-      case 0: console.log("Idle"); break;
-      case 1: console.log("Connecting..."); break;
-      case 2: console.error("❌ Wrong Password"); break;
-      case 3: console.error("❌ SSID Not Found"); break;
-      case 4: console.error("❌ Connection Failed"); break;
-      case 5: console.log("✅ Connected to Wi-Fi"); break;
-    }
-  }
-});
-
-// 2. Poll for status after configuring Wi-Fi
-await BlufiBridge.configureWifi("SSID", "PASSWORD");
-
-// Wait 2-3 seconds for the device to attempt connection, then check status
-setTimeout(async () => {
-    await BlufiBridge.postCustomData("12:"); // Trigger status report (standard Blufi command)
-    await BlufiBridge.requestDeviceStatus(); // Fetch the status
-}, 3000);
-```
+- `DeviceFound`: returns `{ name: string, mac: string, rssi: number }`.
+- `ScanError`: returns `{ error: string }`.
 
 ---
 
-## 🛠 Troubleshooting
+### 3. `BlufiBridge` Methods
 
-*   **iOS: "Developer Mode disabled"**: Go to Settings > Privacy & Security > Developer Mode on your iPhone and enable it.
-*   **iOS: "Module not found"**: Ensure you ran `pod install` inside `ios/` after running the setup script.
-*   **Android: "Unable to locate Java Runtime"**: Ensure you have JDK 17 installed (`java -version`).
-*   **Android: Build Failures**: Ensure you ran `npx expo prebuild` *before* running `npm run setup:android`.
+Core methods for security, configuration, and data exchange.
+
+| Method                  | Parameters         | Description                                                                  |
+| :---------------------- | :----------------- | :--------------------------------------------------------------------------- |
+| `connect`               | `deviceId: string` | Connects to a device via its MAC (Android) or UUID (iOS).                    |
+| `disconnect`            | -                  | Closes the connection.                                                       |
+| `negotiateSecurity`     | -                  | Establishes a secure session (required before configuring Wi-Fi).            |
+| `configureWifi`         | `ssid, password`   | Sends Wi-Fi credentials to the device.                                       |
+| `postCustomData`        | `data: string`     | Sends custom strings (e.g., MQTT server: `1:192.168.1.1`).                   |
+| `requestDeviceVersion`  | -                  | Triggers a `BlufiLog` response containing the firmware version.              |
+| `requestDeviceStatus`   | -                  | Triggers a `BlufiStatus` response with Wi-Fi connection state.               |
+| `requestDeviceWifiScan` | -                  | Asks the device to scan for networks (responds via `BlufiDeviceScanResult`). |
+| `setOpMode`             | `mode: number`     | Sets ESP32 mode (1: STA, 2: SoftAP, 3: SoftAP+STA).                          |
 
 ---
 
-## 🤝 Contributing
+### 4. Event Listeners (`blufiEmitter`)
 
-We welcome contributions! If you find a bug or want to improve the scripts, please check `CONTRIBUTING.md`.
+These listeners are essential for monitoring the provisioning progress.
+
+| Event                       | Field                 | Description                                                          |
+| :-------------------------- | :-------------------- | :------------------------------------------------------------------- |
+| **`BlufiLog`**              | `log: string`         | Detailed native logs for debugging and progress tracking.            |
+| **`BlufiStatus`**           | `status: string`      | High-level status updates (e.g., "Connected", "Security Result: 0"). |
+|                             | `state: number`       | `0` (Disconnected), `2` (Connected).                                 |
+|                             | `staConnectionStatus` | Wi-Fi result: `0` (Idle), `1` (Connecting), `5` (Success).           |
+| **`BlufiData`**             | `data: string`        | Raw custom data received back from the device.                       |
+| **`BlufiDeviceScanResult`** | `data: Array`         | List of SSIDs found by the device.                                   |
+
+---
+
+## 🛠 Features & Best Practices
+
+1.  **Unified Log Handler**: Recommended to consolidate `BlufiLog` and `BlufiStatus` into a single UI log stream for easier troubleshooting.
+2.  **Auto-Reboot Detection**: Listen for the "Disconnected" log message after sending Wi-Fi credentials; this indicates the device has accepted the configuration and is rebooting.
+3.  **Permissions**: On Android 12+, ensure your app requests `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` permissions even if the setup script adds them to the Manifest.
+4.  **Security First**: Always call `negotiateSecurity()` immediately after a successful connection before sending Wi-Fi or MQTT data.
+
+---
+
+## 🤝 Support
+
+The system is built on the official Espressif Blufi SDK (v2.2.0). Native source code is available in `ios-reference/` and `android/` folders for full transparency.
