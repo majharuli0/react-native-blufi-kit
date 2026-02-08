@@ -110,6 +110,13 @@ These listeners are essential for monitoring the provisioning progress.
 
 ---
 
+### 🔗 Demo Application
+
+You can find a complete, ready-to-use demo implementation of this kit here:
+[majharuli0/blufi-test-app](https://github.com/majharuli0/blufi-test-app)
+
+---
+
 ## 🤝 Support
 
 The system is built on the official Espressif Blufi SDK (v2.2.0). Native source code is available in `ios-reference/` and `android/` folders for full transparency.
