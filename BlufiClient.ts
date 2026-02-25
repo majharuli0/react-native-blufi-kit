@@ -69,6 +69,10 @@ export class BlufiClient {
     }
     // Remove scan-specific listeners if needed, or rely on clearListeners
   }
+  // request device wifi scan
+  async requestDeviceWifiScan(): Promise<void> {
+    return BlufiBridge.requestDeviceWifiScan();
+  }
 
   // --- Connection & Provisioning ---
 
@@ -137,6 +141,13 @@ export class BlufiClient {
     if (scannerEmitter) {
       const sub2 = scannerEmitter.addListener('ScanLog', (e) => callback(e.log));
       this.listeners.push(sub2);
+    }
+  }
+
+  onDeviceScanResult(callback: (data: any[]) => void) {
+    if (blufiEmitter) {
+      const sub = blufiEmitter.addListener('BlufiDeviceScanResult', (e) => callback(e.data));
+      this.listeners.push(sub);
     }
   }
 

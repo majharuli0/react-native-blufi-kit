@@ -264,9 +264,6 @@ public class BlufiModule extends ReactContextBaseJavaModule {
             sendLog("Gatt Connection State: " + stateStr + " (" + newState + "), Status: " + status);  
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                new Handler(Looper.getMainLooper()).post(() ->
-                    Toast.makeText(reactContext, "Blufi Connected!", Toast.LENGTH_SHORT).show()        
-                );
                 sendStatus("Connected");
                 
                 WritableMap params = Arguments.createMap();
