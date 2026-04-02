@@ -120,6 +120,10 @@ export class BlufiClient {
     return BlufiBridge.requestDeviceStatus();
   }
 
+  async getDeviceId(): Promise<string> {
+    return BlufiBridge.getDeviceId();
+  }
+
   // --- Event Listeners ---
 
   onStatusChange(callback: (status: { connected: boolean; msg: string }) => void) {

@@ -122,6 +122,11 @@ public class BlufiModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getDeviceId(Promise promise) {
+        promise.resolve(currentDeviceId);
+    }
+
+    @ReactMethod
     public void negotiateSecurity(Promise promise) {
         if (blufiClient == null) {
             promise.reject("ERR_NO_CLIENT", "Blufi client not initialized");
@@ -339,6 +344,7 @@ public class BlufiModule extends ReactContextBaseJavaModule {
             if (data != null) {
                 String dataStr = new String(data);
                 sendLog("Received Custom Data: " + dataStr);
+                
                 WritableMap params = Arguments.createMap();
                 params.putString("data", dataStr);
                 sendEvent("BlufiData", params);
@@ -403,6 +409,7 @@ import android.bluetooth.le.ScanSettings;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.Base64;
 import android.widget.Toast;
 
 import com.facebook.react.bridge.Arguments;
@@ -792,7 +799,8 @@ function installAndroid() {
     if (content.includes('commandLine("node"')) {
       console.log("🔧 Patching settings.gradle for absolute Node path...");
       // Replace "node" with process.execPath (absolute path to current node executable)
-      const nodePath = process.execPath;
+      // Use forward slashes to avoid backslash escape issues in Groovy/Gradle
+      const nodePath = process.execPath.replace(/\\/g, "/");
       content = content.replace(
         /commandLine\("node"/g,
         `commandLine("${nodePath}"`,

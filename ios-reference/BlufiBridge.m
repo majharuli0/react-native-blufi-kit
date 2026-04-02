@@ -17,6 +17,7 @@ RCT_EXTERN_METHOD(requestDeviceWifiScan : (RCTPromiseResolveBlock)
                       resolve reject : (RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(setOpMode : (NSInteger)opMode resolve : (
     RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(getDeviceId : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(requestDeviceVersion)
 RCT_EXTERN_METHOD(requestDeviceStatus)
 

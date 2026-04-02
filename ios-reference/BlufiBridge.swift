@@ -6,7 +6,7 @@ import React
 public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     
     var blufiClient: BlufiClient!
-    var connectedPeripheral: CBPeripheral?
+    var currId: String?
     
     override init() {
         super.init()
@@ -22,13 +22,14 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
     private func sendStatus(_ status: String) {
         sendEvent(withName: "BlufiStatus", body: ["status": status])
     }
-    
+
     @objc func connect(_ deviceId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         // Re-init client to ensure fresh state (Fixes crash on re-connection)
         if (blufiClient != nil) {
             blufiClient.close()
             blufiClient.blufiDelegate = nil
         }
+        currId = deviceId
         blufiClient = BlufiClient()
         blufiClient.blufiDelegate = self
         blufiClient.centralManagerDelete = self
@@ -38,9 +39,14 @@ public class BlufiBridge: RCTEventEmitter, BlufiDelegate {
         blufiClient.connect(deviceId)
         resolve(true)
     }
-    
+
+    @objc func getDeviceId(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        resolve(currId)
+    }
+
     @objc func disconnect() {
         sendLog("Manual disconnect requested")
+        currId = nil
         blufiClient.close()
         sendStatus("Disconnected")
     }
